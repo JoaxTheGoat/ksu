@@ -50,7 +50,7 @@ jobs:
 
       # Passo 7: Salvar o arquivo .zip
       - name: Upload Kernel Zip
-        uses: actions/upload-artifact@v3  # Atualizado para v3
+        uses: actions/upload-artifact@v4  # Atualizado para v4
         with:
           name: anykernel-zip
           path: anykernel/AnyKernel3.zip
