@@ -1,56 +1,94 @@
-name: Kernel 4.14 Build with AnyKernel3
+name: Build-Ginkgo-Final
 
 on:
-  push:
-    branches:
-      - main  # Ou a branch que você utiliza
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # Passo 1: Fazer checkout do código
-      - name: Check out the repository
-        uses: actions/checkout@v2
+      # Passo 1: Baixando o código
+      - name: Baixando o Código
+        uses: actions/checkout@v4
+        with:
+          ref: thirteen
 
-      # Passo 2: Configurar o ambiente
-      - name: Set up environment
+      # Passo 2: Limpar Runner + Instalar Dependências
+      - name: Limpar Runner + Instalar Dependências
         run: |
+          # Libera espaço e RAM do runner
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+
           sudo apt-get update
-          sudo apt-get install -y build-essential gcc make libncurses5-dev libssl-dev bc bison flex libelf-dev libudev-dev unzip git
+          sudo apt-get install -y \
+            bc \
+            build-essential \
+            flex \
+            bison \
+            libssl-dev \
+            libelf-dev \
+            clang \
+            lld \
+            llvm \
+            python3 \
+            python-is-python3 \
+            gcc-aarch64-linux-gnu \
+            gcc-arm-linux-gnueabi
 
-      # Passo 3: Baixar AnyKernel3
-      - name: Download AnyKernel3
-        run: |
-          git clone https://github.com/osm0sis/AnyKernel3.git anykernel
-          cd anykernel
-          git checkout master  # ou uma versão específica, caso precise
+      # Passo 3: Baixar a versão específica do Proton Clang
+      - name: Checkout Proton Clang (versão v13.0.0)
+        uses: actions/checkout@v4
+        with:
+          repository: kdrag0n/proton-clang
+          ref: "v13.0.0"  # Versão mais antiga, compatível com código de 2019
+          fetch-depth: 1
+          path: clang
 
-      # Passo 4: Configurar o Kernel
-      - name: Configure Kernel
+      # Passo 4: Corrigir Linker do Proton Clang
+      - name: Corrigir Linker do Proton Clang
         run: |
-          cd kernel
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig  # Mude conforme sua arquitetura
+          # Remove linkers antigos que quebram no Ubuntu novo
+          rm -f ${{ github.workspace }}/clang/bin/ld
+          rm -f ${{ github.workspace }}/clang/bin/ld.gold
 
       # Passo 5: Compilar o Kernel
-      - name: Build Kernel
+      - name: Compilar Kernel
         run: |
-          cd kernel
-          make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-  # Ajuste o número de núcleos conforme seu CI
+          export PATH="${{ github.workspace }}/clang/bin:$PATH"
 
-      # Passo 6: Empacotar o kernel com AnyKernel3
-      - name: Package with AnyKernel3
-        run: |
-          cd anykernel
-          cp ../kernel/arch/arm64/boot/Image .  # Ou ajuste o caminho do seu arquivo de imagem
-          cp ../kernel/arch/arm64/boot/dtbs/*.dtb .  # Ajuste conforme necessário para os arquivos .dtb
-          # Se for necessário, adicione o initramfs ou outros arquivos
-          zip -r9 AnyKernel3.zip *  # Cria o arquivo .zip
+          # Cria pasta de saída
+          mkdir -p out
 
-      # Passo 7: Salvar o arquivo .zip
-      - name: Upload Kernel Zip
-        uses: actions/upload-artifact@v4  # Atualizado para v4
+          # Define quantidade segura de núcleos
+          CORES=$(nproc --all)
+          if [ "$CORES" -gt 6 ]; then
+            CORES=6
+          fi
+
+          echo "Usando $CORES núcleos para compilação"
+
+          # Defconfig
+          make O=out ARCH=arm64 vendor/ginkgo-perf_defconfig
+
+          # Build
+          make -j$CORES O=out ARCH=arm64 \
+            CC=clang \
+            HOSTCC=gcc \
+            HOSTCXX=g++ \
+            LD=ld.lld \
+            AR=llvm-ar \
+            NM=llvm-nm \
+            OBJCOPY=llvm-objcopy \
+            OBJDUMP=llvm-objdump \
+            STRIP=llvm-strip \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+
+      # Passo 6: Upload do Kernel
+      - name: Upload do Kernel
+        uses: actions/upload-artifact@v4
         with:
-          name: anykernel-zip
-          path: anykernel/AnyKernel3.zip
+          name: Kernel-Ginkgo-Final
+          path: out/arch/arm64/boot/Image.gz-dtb
