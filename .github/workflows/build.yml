@@ -1,128 +1,56 @@
-name: CI Build
+name: Kernel 4.14 Build with AnyKernel3
 
 on:
-  workflow_dispatch:
-    inputs:
-      Build_KSU:
-        required: true
-        type: boolean
-        default: true
-      Build_NonKSU:
-        required: true
-        type: boolean
-        default: true
-      Kernel_Git:
-        required: true
-        type: string
-        default: https://github.com/selfmusing/kernel_xiaomi_violet.git
-      Kernel_Branch:
-        required: true
-        type: string
-        default: main
-      AnyKernel3_Git:
-        required: true
-        type: string
-        default: https://github.com/selfmusing/AnyKernel3.git
-      Device_Code:
-        required: true
-        type: string
-        default: violet
-      Device_Defconfig:
-        required: true
-        type: string
-        default: vendor/violet-perf_defconfig
-      Common_Defconfig:
-        required: false
-        default: 
-        type: string
-      os:
-        required: true
-        type: string
-        default: ubuntu-latest
+  push:
+    branches:
+      - main  # Ou a branch que você utiliza
 
-jobs:    
-  build-ksu:
-    if: ${{ inputs.Build_KSU }}
-    uses: ./.github/workflows/build-kernel.yml
-    with:
-      include_ksu: "KSU"
-      kernel_git: ${{ inputs.Kernel_Git }}
-      kernel_branch: ${{ inputs.Kernel_Branch }}
-      anykernel3_git: ${{ inputs.AnyKernel3_Git }}
-      device_code: ${{ inputs.Device_Code }}
-      device_defconfig: ${{ inputs.Device_Defconfig }}
-      common_defconfig: ${{ inputs.Common_Defconfig }}
-      os: ${{ inputs.os }}
-
-  build-nonksu:
-    if: ${{ inputs.Build_NonKSU }}
-    uses: ./.github/workflows/build-kernel.yml
-    with:
-      include_ksu: "NonKSU"
-      kernel_git: ${{ inputs.Kernel_Git }}
-      kernel_branch: ${{ inputs.Kernel_Branch }}
-      anykernel3_git: ${{ inputs.AnyKernel3_Git }}
-      device_code: ${{ inputs.Device_Code }}
-      device_defconfig: ${{ inputs.Device_Defconfig }}
-      common_defconfig: ${{ inputs.Common_Defconfig }}
-      os: ${{ inputs.os }}
-      
+jobs:
   build:
-    needs: [build-ksu, build-nonksu]
-    if: |
-      always() &&
-      !failure() &&
-      !cancelled()
-    runs-on: ${{ inputs.os }}
+    runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
-        id: checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Get Tag
-        id: tag
+      # Passo 1: Fazer checkout do código
+      - name: Check out the repository
+        uses: actions/checkout@v2
+
+      # Passo 2: Configurar o ambiente
+      - name: Set up environment
         run: |
-          latest_tag=$(curl -s https://api.github.com/repos/$GITHUB_REPOSITORY/releases/latest | grep "tag_name" | cut -d '"' -f 4)
-          if [[ -z "$latest_tag" ]]; then latest_tag='v0'; fi
-          echo "Latest Tag: $latest_tag"
-          echo "tag=v$((${latest_tag:1} + 1))" >> $GITHUB_ENV
-          
-      - name: Download artifacts
-        id: artifacts
-        uses: actions/download-artifact@v4
-        with:
-          merge-multiple: false
-          path: out/download/.
-          
-      - name: Prepare Release
-        id: prepare
+          sudo apt-get update
+          sudo apt-get install -y build-essential gcc make libncurses5-dev libssl-dev bc bison flex libelf-dev libudev-dev unzip git
+
+      # Passo 3: Baixar AnyKernel3
+      - name: Download AnyKernel3
         run: |
-          cd $GITHUB_WORKSPACE
-          mkdir -p out/artifacts
-          if [[ $(ls out/download | grep "\-KSU") ]]; then
-            cp out/download/*-KSU/bodyFile.md out/bodyFile.md
-            echo "name=$(cat out/download/*-KSU/name.txt)" >> $GITHUB_ENV
-          else
-            cp out/download/*-NonKSU/bodyFile.md out/bodyFile.md
-            echo "name=$(cat out/download/*-NonKSU/name.txt)" >> $GITHUB_ENV
-          fi
-          if [[ $(ls out/download | grep "manager") ]]; then
-            cp out/download/manager/*.apk out/artifacts/Manager.apk
-          fi
-          cp out/download/*KSU/*.zip out/artifacts/
-          
-      - name: Release
-        id: release
-        uses: ncipollo/release-action@v1
+          git clone https://github.com/osm0sis/AnyKernel3.git anykernel
+          cd anykernel
+          git checkout master  # ou uma versão específica, caso precise
+
+      # Passo 4: Configurar o Kernel
+      - name: Configure Kernel
+        run: |
+          cd kernel
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig  # Mude conforme sua arquitetura
+
+      # Passo 5: Compilar o Kernel
+      - name: Build Kernel
+        run: |
+          cd kernel
+          make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-  # Ajuste o número de núcleos conforme seu CI
+
+      # Passo 6: Empacotar o kernel com AnyKernel3
+      - name: Package with AnyKernel3
+        run: |
+          cd anykernel
+          cp ../kernel/arch/arm64/boot/Image .  # Ou ajuste o caminho do seu arquivo de imagem
+          cp ../kernel/arch/arm64/boot/dtbs/*.dtb .  # Ajuste conforme necessário para os arquivos .dtb
+          # Se for necessário, adicione o initramfs ou outros arquivos
+          zip -r9 AnyKernel3.zip *  # Cria o arquivo .zip
+
+      # Passo 7: Salvar o arquivo .zip
+      - name: Upload Kernel Zip
+        uses: actions/upload-artifact@v2
         with:
-          name: "${{ env.name }}-${{ env.tag }}"
-          tag: "${{ env.tag }}"
-          allowUpdates: false
-          bodyFile: "${{ github.workspace }}/out/bodyFile.md"
-          artifacts: "${{ github.workspace }}/out/artifacts/*"
-          token: ${{ secrets.GITHUB_TOKEN }}
-          
-      - name: Cleanup
-        id: cleanup
-        run: rm -r $GITHUB_WORKSPACE/out/*
+          name: anykernel-zip
+          path: anykernel/AnyKernel3.zip
