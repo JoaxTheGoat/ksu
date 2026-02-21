@@ -20,6 +20,7 @@ jobs:
           sudo apt install -y ccache
           sudo apt update
           sudo apt install -y gcc-aarch64-linux-gnu  # Adicionar a instalação do GCC para ARM64
+          sudo apt install -y gcc-arm-linux-gnueabi # GCC arm32
           
       - name: Setup Android environment
         run: |
