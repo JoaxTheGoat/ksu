@@ -24,13 +24,12 @@ jobs:
           export ANDROID_DIR=$HOME/android
           mkdir -p $ANDROID_DIR
           cd $ANDROID_DIR
-          git clone --single-branch --branch main https://github.com/JoaxTheGoat/ksu.git
+          git clone --depth 1 https://github.com/JoaxTheGoat/ksu.git
           cd ksu
-          export KERNEL_DIR=$(pwd)
 
       - name: Compile Kernel
         run: |
-          cd $KERNEL_DIR
+          cd ksu
           # Fazer o download das dependências do kernel
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- arch/arm64/configs/vendor/ginkgo-perf_defconfig
           # Compile o kernel
@@ -38,9 +37,9 @@ jobs:
 
       - name: Build Boot Image
         run: |
-          cd $KERNEL_DIR
+          cd ksu
           # Criando o boot.img
-          mkbootimg --kernel $KERNEL_DIR/arch/arm64/boot/Image --ramdisk $KERNEL_DIR/ramdisk.img --dt $KERNEL_DIR/arch/arm64/boot/dtbs/$(ls $KERNEL_DIR/arch/arm64/boot/dtbs/ | grep .dtb | head -n 1) --out boot.img
+          mkbootimg --kernel ksu/arch/arm64/boot/Image --ramdisk ksu/ramdisk.img --dt ksu/arch/arm64/boot/dtbs/$(ls ksu/arch/arm64/boot/dtbs/ | grep .dtb | head -n 1) --out boot.img
 
       - name: Upload Boot Image as Artifact
         uses: actions/upload-artifact@v4
