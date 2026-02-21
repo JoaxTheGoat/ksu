@@ -32,7 +32,7 @@ jobs:
         run: |
           cd $KERNEL_DIR
           # Fazer o download das dependências do kernel
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- vendor/ginkgo-perf_defconfig
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- configs/vendor/ginkgo-perf_defconfig
           # Compile o kernel
           make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-
 
