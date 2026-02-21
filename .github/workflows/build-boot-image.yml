@@ -43,7 +43,7 @@ jobs:
           mkbootimg --kernel $KERNEL_DIR/arch/arm64/boot/Image --ramdisk $KERNEL_DIR/ramdisk.img --dt $KERNEL_DIR/arch/arm64/boot/dtbs/$(ls $KERNEL_DIR/arch/arm64/boot/dtbs/ | grep .dtb | head -n 1) --out boot.img
 
       - name: Upload Boot Image as Artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: boot-img
           path: boot.img
