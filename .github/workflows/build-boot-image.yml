@@ -18,6 +18,8 @@ jobs:
           sudo apt update
           sudo apt install -y git clang gcc make bc bison flex libssl-dev libncurses5-dev
           sudo apt install -y ccache
+          sudo apt update
+          sudo apt install -y gcc-aarch64-linux-gnu  # Adicionar a instalação do GCC para ARM64
           
       - name: Setup Android environment
         run: |
