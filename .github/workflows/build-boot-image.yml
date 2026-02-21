@@ -31,7 +31,7 @@ jobs:
       - name: Compile Kernel
         run: |
           export CROSS_COMPILE_ARM32=arm-linux-gnueabi-  # Definindo o prefixo para ARM32
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- arch/arm64/configs/vendor/ginkgo-perf_defconfig
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- vendor/ginkgo-perf_defconfig
           make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi-
 
       - name: Build Boot Image
