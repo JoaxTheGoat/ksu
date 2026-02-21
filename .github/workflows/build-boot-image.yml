@@ -1,4 +1,4 @@
-name: Build Boot Image
+name: Build Kernel and Boot Image
 
 on:
   push:
@@ -11,19 +11,16 @@ jobs:
 
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Set up environment
         run: |
           sudo apt update
           sudo apt install -y git clang gcc make bc bison flex libssl-dev libncurses5-dev
           sudo apt install -y ccache
-          sudo apt update
-          sudo apt install -y gcc-aarch64-linux-gnu  # Adicionar a instalação do GCC para ARM64
-          sudo apt install -y gcc-arm-linux-gnueabi # GCC arm32
-          
+          sudo apt install -y gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi  # Certifique-se de que o GCC ARM32 está instalado
+
       - name: Setup Android environment
-        run: |
           export ANDROID_DIR=$HOME/android
           mkdir -p $ANDROID_DIR
           cd $ANDROID_DIR
@@ -32,13 +29,15 @@ jobs:
 
       - name: Compile Kernel
         run: |
-          # Fazer o download das dependências do kernel
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- vendor/ginkgo-perf_defconfig
-          # Compile o kernel
-          make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_ARM32=arm-linux-gnueabi-  # Definindo o prefixo para ARM32
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- arch/arm64/configs/vendor/ginkgo-perf_defconfig
+          make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi-
 
       - name: Build Boot Image
         run: |
+          cd ksu
+          # Baixar mkbootimg se necessário
+          git clone https://android.googlesource.com/platform/system/tools/mkbootimg tools -b master-kernel-build-2022 --depth=1
           # Criando o boot.img
           mkbootimg --kernel ksu/arch/arm64/boot/Image --ramdisk ksu/ramdisk.img --dt ksu/arch/arm64/boot/dtbs/$(ls ksu/arch/arm64/boot/dtbs/ | grep .dtb | head -n 1) --out boot.img
 
