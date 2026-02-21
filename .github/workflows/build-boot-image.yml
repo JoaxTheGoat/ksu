@@ -21,6 +21,7 @@ jobs:
           sudo apt install -y gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi  # Certifique-se de que o GCC ARM32 está instalado
 
       - name: Setup Android environment
+        run: |
           export ANDROID_DIR=$HOME/android
           mkdir -p $ANDROID_DIR
           cd $ANDROID_DIR
