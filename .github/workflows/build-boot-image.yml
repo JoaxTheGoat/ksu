@@ -1,0 +1,49 @@
+name: Build Boot Image
+
+on:
+  push:
+    branches:
+      - main  # Ou a branch que você está usando para build
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v2
+
+      - name: Set up environment
+        run: |
+          sudo apt update
+          sudo apt install -y git clang gcc make bc bison flex libssl-dev libncurses5-dev
+          sudo apt install -y ccache
+          
+      - name: Setup Android environment
+        run: |
+          export ANDROID_DIR=$HOME/android
+          mkdir -p $ANDROID_DIR
+          cd $ANDROID_DIR
+          git clone --single-branch --branch main https://github.com/JoaxTheGoat/ksu.git
+          cd ksu
+          export KERNEL_DIR=$(pwd)
+
+      - name: Compile Kernel
+        run: |
+          cd $KERNEL_DIR
+          # Fazer o download das dependências do kernel
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- vendor/ginkgo-perf_defconfig
+          # Compile o kernel
+          make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-
+
+      - name: Build Boot Image
+        run: |
+          cd $KERNEL_DIR
+          # Criando o boot.img
+          mkbootimg --kernel $KERNEL_DIR/arch/arm64/boot/Image --ramdisk $KERNEL_DIR/ramdisk.img --dt $KERNEL_DIR/arch/arm64/boot/dtbs/$(ls $KERNEL_DIR/arch/arm64/boot/dtbs/ | grep .dtb | head -n 1) --out boot.img
+
+      - name: Upload Boot Image as Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: boot-img
+          path: boot.img
